@@ -39,6 +39,8 @@ void I2CInit(int iSpeed);
 void I2CWrite(uint8_t u8Addr, uint8_t *pData, int iLen);
 void I2CRead(uint8_t u8Addr, uint8_t *pData, int iLen);
 int I2CTest(uint8_t u8Addr);
+void Standby82ms(uint8_t iTicks);
+void breatheLED(uint8_t u8Pin, int iPeriod);
 
 
 #endif /* USER_ARDUINO_H_ */
