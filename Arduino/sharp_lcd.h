@@ -11,6 +11,15 @@
 #define LCD_WIDTH 128
 #define LCD_HEIGHT 128
 
+// 4 possible font sizes: 8x8, 16x32, 6x8, 16x16 (stretched from 8x8)
+enum {
+   FONT_6x8 = 0,
+   FONT_8x8,
+   FONT_12x16,
+   FONT_16x16,
+   FONT_16x32
+};
+
 // Proportional font data taken from Adafruit_GFX library
 /// Font data stored PER GLYPH
 #if !defined( _ADAFRUIT_GFX_H ) && !defined( _GFXFONT_H_ )
@@ -34,10 +43,11 @@ typedef struct {
 } GFXfont;
 #endif // _ADAFRUIT_GFX_H
 
-void sharp_init(int iSpeed, uint8_t u8CS, uint8_t u8DISP);
-void sharp_fill(uint8_t u8Pattern);
-void sharp_print(const GFXfont *pFont, int x, int y, char *szText, uint8_t u8Color);
-void sharp_writeLine(uint8_t *pData, int iLen);
-void sharp_writeBuffer(int iStartLine);
+void sharpInit(int iSpeed, uint8_t u8CS, uint8_t u8DISP);
+void sharpFill(uint8_t u8Pattern);
+void sharpWriteLine(uint8_t *pData, int iLen);
+void sharpWriteBuffer(int iStartLine, int iLineCount);
+int sharpWriteString(int x, int y, char *szMsg, int iSize, int bInvert);
+void sharpWriteStringCustom(const GFXfont *pFont, int x, int y, char *szMsg, uint8_t ucColor);
 
 #endif /* USER_SHARP_H_ */
