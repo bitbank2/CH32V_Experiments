@@ -196,7 +196,7 @@ uint8_t u8 = 0x80; // start command
         return;
    digitalWrite(u8CSPin, 1); // activate CS
    u8 = (u8 | u8VCOM) & 0xc0;
-   u8VCOM += 8; // toggle VCOM every 8 lines (0x40)
+   u8VCOM += 1; // toggle VCOM every 64 lines (0x40)
    SPI_write(&u8, 1); // start+vcom
    u8 = ucMirror[iLine+1]; // flip bit direction
    SPI_write(&u8, 1); // destination line number
@@ -221,6 +221,68 @@ void sharpFill(uint8_t u8Pattern)
 {
   memset(u8Cache, u8Pattern, sizeof(u8Cache));
 } /* sharpFill() */
+
+void sharpDrawSprite(int x, int y, int cx, int cy, uint8_t *pSprite, int iPitch, int bInvert)
+{
+    int tx, ty, dx, dy, iStartX;
+    uint8_t *s, *d, pix, ucSrcMask, ucDstMask, u8Invert;
+    int iLocalPitch;
+    iLocalPitch = LCD_WIDTH/8;
+
+    u8Invert = (bInvert) ? 0xff : 0x00;
+    if (x+cx < 0 || y+cy < 0 || x >= LCD_WIDTH || y >= LCD_HEIGHT/2)
+        return; // out of bounds
+    dy = y; // destination y
+    if (y < 0) // skip the invisible parts
+    {
+        cy += y;
+        y = -y;
+        pSprite += (y * iPitch);
+        dy = 0;
+    }
+    if (y + cy > 64)
+        cy = LCD_HEIGHT/2 - y;
+    dx = x;
+    iStartX = 0;
+    if (x < 0)
+    {
+        cx += x;
+        x = -x;
+        iStartX = x;
+        dx = 0;
+    }
+    if (x + cx > LCD_WIDTH)
+        cx = LCD_WIDTH - x;
+    for (ty=dy; ty<(dy+cy); ty++)
+    {
+        s = &pSprite[(iStartX >> 3)];
+        d = &u8Cache[(ty*iLocalPitch) + (dx >> 3)];
+        ucSrcMask = 0x80 >> (iStartX & 7);
+        pix = *s++;
+        pix ^= u8Invert;
+        ucDstMask = 0x80 >> (dx & 7);
+		  for (tx=dx; tx<(dx+cx); tx++)
+		  {
+			if (pix & ucSrcMask) // set pixel in source, set it in dest
+				d[0] &= ~ucDstMask;
+			else
+				d[0] |= ucDstMask;
+			ucDstMask >>= 1;
+			if (ucDstMask == 0) { // start next byte
+				d++;
+				ucDstMask = 0x80;
+			}
+			ucSrcMask >>= 1;
+			if (ucSrcMask == 0) // read next byte
+			{
+				ucSrcMask = 0x80;
+				pix = *s++;
+				pix ^= u8Invert;
+			}
+		  } // for tx
+        pSprite += iPitch;
+    } // for ty
+} /* sharpDrawSprite() */
 
 //
 // Draw a string of characters in a custom font
@@ -484,3 +546,11 @@ unsigned char c, ucDstMask, ucSrcMask, *d, *s, uc, ucInvert;
   return -1; // invalid size
 } /* sharpWriteString() */
 
+int sharpGetCursorX(void)
+{
+	return cursor_x;
+}
+int sharpGetCursorY(void)
+{
+	return cursor_y;
+}

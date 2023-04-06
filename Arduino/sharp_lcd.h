@@ -45,8 +45,11 @@ typedef struct {
 
 void sharpInit(int iSpeed, uint8_t u8CS, uint8_t u8DISP);
 void sharpFill(uint8_t u8Pattern);
+void sharpDrawSprite(int x, int y, int cx, int cy, uint8_t *pData, int iPitch, int bInvert);
 void sharpWriteLine(uint8_t *pData, int iLen);
 void sharpWriteBuffer(int iStartLine, int iLineCount);
+int sharpGetCursorX(void);
+int sharpGetCursorY(void);
 int sharpWriteString(int x, int y, char *szMsg, int iSize, int bInvert);
 void sharpWriteStringCustom(const GFXfont *pFont, int x, int y, char *szMsg, uint8_t ucColor);
 
