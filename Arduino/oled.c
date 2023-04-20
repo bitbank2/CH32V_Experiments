@@ -184,6 +184,93 @@ uint8_t buf[4];
   I2CWrite(oledAddr, buf, 4);
 } /* oledSetPosition() */
 
+void oledDrawSprite(int x, int y, int cx, int cy, uint8_t *pSprite, int iPitch, int bInvert)
+{
+    int tx, ty, dx, dy, iStartX;
+    uint8_t *s, *d, pix, ucSrcMask, ucDstMask, ucFill;
+
+    if (x+cx < 0 || y+cy < 0 || x >= OLED_WIDTH || y >= OLED_HEIGHT)
+        return; // out of bounds
+    ucFill = (bInvert) ? 0xff : 0x00;
+    dy = y; // destination y
+    if (y < 0) // skip the invisible parts
+    {
+        cy += y;
+        y = -y;
+        pSprite += (y * iPitch);
+        dy = 0;
+    }
+    if (y + cy > 64)
+        cy = OLED_HEIGHT - y;
+    iStartX = 0;
+    dx = x;
+    if (x < 0)
+    {
+        cx += x;
+        x = -x;
+        iStartX = x;
+        dx = 0;
+    }
+    if (x + cx > OLED_WIDTH)
+        cx = OLED_WIDTH - x;
+    u8Cache[0] = 0x40; // data block
+    memset(&u8Cache[1], ucFill, sizeof(u8Cache)-1); // start with black
+    for (ty=0; ty<cy; ty++)
+    {
+        s = &pSprite[(iStartX >> 3)];
+        d = &u8Cache[1];
+        ucSrcMask = 0x80 >> (iStartX & 7);
+        pix = *s++;
+        ucDstMask = 1 << (dy & 7);
+		  for (tx=0; tx<cx; tx++)
+		  {
+			if (pix & ucSrcMask) { // set pixel in source, set it in dest
+				if (bInvert)
+					d[0] &= ~ucDstMask;
+				else
+					d[0] |= ucDstMask;
+			}
+			d++; // next pixel column
+			ucSrcMask >>= 1;
+			if (ucSrcMask == 0) // read next byte
+			{
+				ucSrcMask = 0x80;
+				pix = *s++;
+			}
+		  } // for tx
+        dy++;
+        pSprite += iPitch;
+        if (ucDstMask == 0x80) { // last row of byte, time to write to the display
+        	oledSetPosition(dx, dy);
+        	I2CWrite(oledAddr, u8Cache, cx+1);
+        	memset(&u8Cache[1], ucFill, sizeof(u8Cache)-1);
+        }
+    } // for ty
+} /* oledDrawSprite() */
+
+//
+// Turn OLED main power on or off
+// I2C is still responsive when power is off
+//
+void oledPower(int bOn)
+{
+	uint8_t ucTemp[4];
+
+	ucTemp[0] = 0; // CMD
+	ucTemp[1] = 0xae | (bOn != 0); // power on/off (LSB)
+	I2CWrite(oledAddr, ucTemp, 2);
+} /* oledPower() */
+
+int oledGetCursorX(void)
+{
+	return cursor_x;
+}
+
+int oledGetCursorY(void)
+{
+	return cursor_y;
+}
+
 void oledFill(uint8_t ucData)
 {
 uint8_t x, y;
@@ -451,7 +538,7 @@ GFXglyph glyph, *pGlyph;
          continue; // skip it
       c -= font.first; // first char of font defined
       memcpy_P(&glyph, &font.glyph[c], sizeof(glyph));
-      dx = x + pGlyph->xOffset; // offset from character UL to start drawing
+      dx = x; // + pGlyph->xOffset; // offset from character UL to start drawing
       dy = y + pGlyph->yOffset;
       s = font.bitmap + pGlyph->bitmapOffset; // start of bitmap data
       // Bitmap drawing loop. Image is MSB first and each pixel is packed next
@@ -466,7 +553,7 @@ GFXglyph glyph, *pGlyph;
       memset(&u8Cache[1], ucFill, sizeof(u8Cache)-1);
       for (ty=dy; ty<end_y && ty < OLED_HEIGHT; ty++) {
           ucMask = 1<<(ty & 7); // destination bit number for this line
-          d = &u8Cache[1]; // no backing ram; buffer 8 lines at a time
+          d = &u8Cache[1+pGlyph->xOffset]; // no backing ram; buffer 8 lines at a time
          for (tx=0; tx<pGlyph->width; tx++) {
             if (bits == 0) { // need to read more font data
                uc = pgm_read_byte(&s[iBitOff>>3]); // get more font bitmap data
@@ -492,7 +579,7 @@ GFXglyph glyph, *pGlyph;
          } // for x
           if ((ucMask == 0x80 || ty == end_y-1)) { // dump this line
               oledSetPosition(dx, (ty & 0xfff8));
-              I2CWrite(oledAddr, u8Cache, pGlyph->width + 1);
+              I2CWrite(oledAddr, u8Cache, pGlyph->xAdvance+1);
               memset(&u8Cache[1], ucFill, sizeof(u8Cache)-1); // NB: assume no DMA
           }
       } // for y
